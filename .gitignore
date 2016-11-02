@@ -66,3 +66,5 @@ target/
 
 # pyenv
 .python-version
+cython/factory.cpp
+cython/version.cpp
