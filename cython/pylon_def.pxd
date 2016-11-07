@@ -109,6 +109,12 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
         String_t GetVendorName() except +
         String_t GetDeviceClass() except +
 
+    cdef enum EGrabStrategy:
+        GrabStrategy_OneByOne,
+        GrabStrategy_LatestImageOnly,
+        GrabStrategy_LatestImages,
+        GrabStrategy_UpcomingImage
+
     cdef cppclass CInstantCamera:
         CInstantCamera()
         void Attach(IPylonDevice*)
@@ -119,12 +125,20 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
         void StopGrabbing() except +
         bool IsOpen() except +
         IPylonDevice* DetachDevice() except +
-        void StartGrabbing() except +
-        void StartGrabbing(size_t maxImages) except +    #FIXME: implement different strategies
+        void StartGrabbing(EGrabStrategy strategy) except +
+        void StartGrabbing(size_t maxImages, EGrabStrategy strategy) except +
         bool IsGrabbing()
         # RetrieveResult() is blocking call into C++ native SDK, allow it to be called without GIL
         bool RetrieveResult(unsigned int timeout_ms, CGrabResultPtr& grab_result) nogil except + # FIXME: Timout handling
         INodeMap& GetNodeMap()
+
+        # From CInstantCameraParams_Params base class
+        IInteger &MaxNumBuffer;
+        IInteger &MaxNumQueuedBuffer;
+        IInteger &OutputQueueSize;
+
+
+
 
     cdef cppclass DeviceInfoList_t:
         cppclass iterator:
