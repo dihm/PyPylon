@@ -56,13 +56,13 @@ cdef class DeviceInfo:
     def __repr__(self):
         return '<DeviceInfo {1}>'.format(self.serial_number, self.friendly_name)
 
-cdef class _PropertyMap:
+cdef class NodeMap:
     cdef:
         INodeMap* map
 
     @staticmethod
     cdef create(INodeMap* map):
-        obj = _PropertyMap()
+        obj = NodeMap()
         obj.map = map
         return obj
 
@@ -96,28 +96,26 @@ cdef class _PropertyMap:
         if not node_is_readable(node):
             raise IOError('Key is not readable')
 
-        # We need to try different types and check if the dynamic_cast succeeds... UGLY!
-        # Potentially we could also use GetPrincipalInterfaceType here.
-        cdef IBoolean* boolean_value = dynamic_cast_iboolean_ptr(node)
-        if boolean_value != NULL:
-            return boolean_value.GetValue()
+        # TODO: Would be nice to figure out how to do enums.
 
-        cdef IInteger* integer_value = dynamic_cast_iinteger_ptr(node)
-        if integer_value != NULL:
-            return integer_value.GetValue()
+        cdef EInterfaceType interface_type = node.GetPrincipalInterfaceType()
 
-        cdef IFloat* float_value = dynamic_cast_ifloat_ptr(node)
-        if float_value != NULL:
-            return float_value.GetValue()
+        if interface_type == intfIBoolean:
+            return dynamic_cast_iboolean_ptr(node).GetValue()
 
-        # TODO: Probably we also need some type of enum to be useful
+        if interface_type == intfIInteger:
+            return dynamic_cast_iinteger_ptr(node).GetValue()
 
-        # Potentially, we can always get the setting by string
+        if interface_type == intfIFloat:
+            return dynamic_cast_ifloat_ptr(node).GetValue()
+
+        # Can generally always access a setting by string
         cdef IValue* string_value = dynamic_cast_ivalue_ptr(node)
         if string_value == NULL:
-            return
+            raise RuntimeError('Can not get key %s as string' % key)
 
         return (<string>(string_value.ToString())).decode()
+
 
     def __setitem__(self, str key, value):
         cdef bytes bytes_name = key.encode()
@@ -129,38 +127,40 @@ cdef class _PropertyMap:
         if not node_is_writable(node):
             raise IOError('Key is not writable')
 
-        # We need to try different types and check if the dynamic_cast succeeds... UGLY!
-        # Potentially we could also use GetPrincipalInterfaceType here.
-        cdef IBoolean* boolean_value = dynamic_cast_iboolean_ptr(node)
-        if boolean_value != NULL:
-            boolean_value.SetValue(value)
+        # TODO: Would be nice to figure out how to do enums.
+
+        cdef EInterfaceType interface_type = node.GetPrincipalInterfaceType()
+
+        if interface_type == intfIBoolean:
+            dynamic_cast_iboolean_ptr(node).SetValue(value)
             return
 
-        cdef IInteger* integer_value = dynamic_cast_iinteger_ptr(node)
-        if integer_value != NULL:
+        cdef IInteger* integer_value
+        if interface_type == intfIInteger:
+            integer_value = dynamic_cast_iinteger_ptr(node)
             if value < integer_value.GetMin() or value > integer_value.GetMax():
                 raise ValueError('Parameter value for {} not inside valid range [{}, {}], was {}'.format(
                     key, integer_value.GetMin(), integer_value.GetMax(), value))
             integer_value.SetValue(value)
             return
 
-        cdef IFloat* float_value = dynamic_cast_ifloat_ptr(node)
-        if float_value != NULL:
+        cdef IFloat* float_value
+        if interface_type == intfIFloat:
+            float_value = dynamic_cast_ifloat_ptr(node)
             if value < float_value.GetMin() or value > float_value.GetMax():
                 raise ValueError('Parameter value for {} not inside valid range [{}, {}], was {}'.format(
                     key, float_value.GetMin(), float_value.GetMax(), value))
             float_value.SetValue(value)
             return
 
-        # TODO: Probably we also need some type of enum to be useful
-
-        # Potentially, we can always set the setting by string
+        # Can generally always access a setting by string
         cdef IValue* string_value = dynamic_cast_ivalue_ptr(node)
         if string_value == NULL:
             raise RuntimeError('Can not set key %s by string' % key)
 
         cdef bytes bytes_value = str(value).encode()
         string_value.FromString(gcstring(bytes_value))
+
 
     def keys(self):
         node_keys = list()
@@ -204,7 +204,7 @@ cdef class Camera:
                 self.camera.Open()
                 
     property is_grabbing:
-        def __get__(self):		
+        def __get__(self):
             return self.camera.IsGrabbing()
 
     def open(self):
@@ -285,7 +285,7 @@ cdef class Camera:
 
     property properties:
         def __get__(self):
-            return _PropertyMap.create(&self.camera.GetNodeMap())
+            return NodeMap.create(&self.camera.GetNodeMap())
 
     # Configuration properties associated with various grab strategies
     property max_num_buffer:

@@ -8,6 +8,20 @@ cdef extern from "Base/GCBase.h":
 
 cdef extern from "GenApi/GenApi.h" namespace 'GenApi':
 
+    ctypedef enum EInterfaceType:
+        intfIValue,
+        intfIBase,
+        intfIInteger,
+        intfIBoolean,
+        intfICommand,
+        intfIFloat,
+        intfIString,
+        intfIRegister,
+        intfICategory,
+        intfIEnumeration,
+        intfIEnumEntry,
+        intfIPort
+
     cdef cppclass INode:
         gcstring GetName(bool FullQualified=False)
         gcstring GetNameSpace()
@@ -15,6 +29,8 @@ cdef extern from "GenApi/GenApi.h" namespace 'GenApi':
         gcstring GetDisplayName()
         bool IsFeature()
         gcstring GetValue()
+        EInterfaceType GetPrincipalInterfaceType()
+
 
     # Types an INode could be
     cdef cppclass IValue:
