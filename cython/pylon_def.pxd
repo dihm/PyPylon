@@ -8,6 +8,20 @@ cdef extern from "Base/GCBase.h":
 
 cdef extern from "GenApi/GenApi.h" namespace 'GenApi':
 
+    ctypedef enum EInterfaceType:
+        intfIValue,
+        intfIBase,
+        intfIInteger,
+        intfIBoolean,
+        intfICommand,
+        intfIFloat,
+        intfIString,
+        intfIRegister,
+        intfICategory,
+        intfIEnumeration,
+        intfIEnumEntry,
+        intfIPort
+
     cdef cppclass INode:
         gcstring GetName(bool FullQualified=False)
         gcstring GetNameSpace()
@@ -15,6 +29,8 @@ cdef extern from "GenApi/GenApi.h" namespace 'GenApi':
         gcstring GetDisplayName()
         bool IsFeature()
         gcstring GetValue()
+        EInterfaceType GetPrincipalInterfaceType()
+
 
     # Types an INode could be
     cdef cppclass IValue:
@@ -75,11 +91,18 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
     cdef cppclass String_t
     cdef cppclass StringList_t
 
+    cdef enum EPayloadType:
+        PayloadType_Undefined,
+        PayloadType_Image,
+        PayloadType_RawData,
+        PayloadType_File,
+        PayloadType_ChunkData,
+        PayloadType_DeviceSpecific
+
+
     # Top level init functions
     void PylonInitialize() except +
     void PylonTerminate() except +
-
-    # cdef enum EPixelType:
 
     cdef cppclass IImage:
         uint32_t GetWidth()
@@ -89,12 +112,13 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
         void* GetBuffer()
         bool IsValid()
 
-    cdef cppclass CGrabResultData:
-        bool GrabSucceeded()
+
+    # NOTE: We don't bother providing cython import definition for CGrabResultData class as the only way that CGrabResultPtr provides
+    # for accessing its underlying data is with a -> operator override, which cython doesn't support.  Instead have to use the 
+    # assorted ACCESS_CGrabResultPtr_xxx functions
 
     cdef cppclass CGrabResultPtr:
         IImage& operator()
-        #CGrabResultData* operator->()
 
 
     cdef cppclass IPylonDevice:
@@ -140,6 +164,8 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
 
 
 
+
+
     cdef cppclass DeviceInfoList_t:
         cppclass iterator:
             CDeviceInfo operator*()
@@ -160,8 +186,16 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
 cdef extern from "pylon/PylonIncludes.h"  namespace 'Pylon::CTlFactory':
     CTlFactory& GetInstance()
 
-# EVIL HACK: We cannot dereference officially with the -> operator. So we use ugly macros...
+# EVIL HACK: Cython does not support the -> deference operator, however the only public interface that CGrabResultPtr smart
+# pointer provides to its underlying CGrabResultData object is with a -> operator override.  As an alternative have to use
+# bundle of helper macros from "hacks.h" to get at CGrabResultData members
+
 cdef extern from 'hacks.h':
     bool ACCESS_CGrabResultPtr_GrabSucceeded(CGrabResultPtr ptr)
     String_t ACCESS_CGrabResultPtr_GetErrorDescription(CGrabResultPtr ptr)
     uint32_t ACCESS_CGrabResultPtr_GetErrorCode(CGrabResultPtr ptr)
+    EPayloadType ACCESS_CGrabResultPtr_GetPayloadType(CGrabResultPtr ptr)
+    INodeMap& ACCESS_CGrabResultPtr_GetChunkDataNodeMap(CGrabResultPtr ptr)
+
+
+

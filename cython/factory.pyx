@@ -56,13 +56,13 @@ cdef class DeviceInfo:
     def __repr__(self):
         return '<DeviceInfo {1}>'.format(self.serial_number, self.friendly_name)
 
-cdef class _PropertyMap:
+cdef class NodeMap:
     cdef:
         INodeMap* map
 
     @staticmethod
     cdef create(INodeMap* map):
-        obj = _PropertyMap()
+        obj = NodeMap()
         obj.map = map
         return obj
 
@@ -96,28 +96,26 @@ cdef class _PropertyMap:
         if not node_is_readable(node):
             raise IOError('Key is not readable')
 
-        # We need to try different types and check if the dynamic_cast succeeds... UGLY!
-        # Potentially we could also use GetPrincipalInterfaceType here.
-        cdef IBoolean* boolean_value = dynamic_cast_iboolean_ptr(node)
-        if boolean_value != NULL:
-            return boolean_value.GetValue()
+        # TODO: Would be nice to figure out how to do enums.
 
-        cdef IInteger* integer_value = dynamic_cast_iinteger_ptr(node)
-        if integer_value != NULL:
-            return integer_value.GetValue()
+        cdef EInterfaceType interface_type = node.GetPrincipalInterfaceType()
 
-        cdef IFloat* float_value = dynamic_cast_ifloat_ptr(node)
-        if float_value != NULL:
-            return float_value.GetValue()
+        if interface_type == intfIBoolean:
+            return dynamic_cast_iboolean_ptr(node).GetValue()
 
-        # TODO: Probably we also need some type of enum to be useful
+        if interface_type == intfIInteger:
+            return dynamic_cast_iinteger_ptr(node).GetValue()
 
-        # Potentially, we can always get the setting by string
+        if interface_type == intfIFloat:
+            return dynamic_cast_ifloat_ptr(node).GetValue()
+
+        # Can generally always access a setting by string
         cdef IValue* string_value = dynamic_cast_ivalue_ptr(node)
         if string_value == NULL:
-            return
+            raise RuntimeError('Can not get key %s as string' % key)
 
         return (<string>(string_value.ToString())).decode()
+
 
     def __setitem__(self, str key, value):
         cdef bytes bytes_name = key.encode()
@@ -129,38 +127,40 @@ cdef class _PropertyMap:
         if not node_is_writable(node):
             raise IOError('Key is not writable')
 
-        # We need to try different types and check if the dynamic_cast succeeds... UGLY!
-        # Potentially we could also use GetPrincipalInterfaceType here.
-        cdef IBoolean* boolean_value = dynamic_cast_iboolean_ptr(node)
-        if boolean_value != NULL:
-            boolean_value.SetValue(value)
+        # TODO: Would be nice to figure out how to do enums.
+
+        cdef EInterfaceType interface_type = node.GetPrincipalInterfaceType()
+
+        if interface_type == intfIBoolean:
+            dynamic_cast_iboolean_ptr(node).SetValue(value)
             return
 
-        cdef IInteger* integer_value = dynamic_cast_iinteger_ptr(node)
-        if integer_value != NULL:
+        cdef IInteger* integer_value
+        if interface_type == intfIInteger:
+            integer_value = dynamic_cast_iinteger_ptr(node)
             if value < integer_value.GetMin() or value > integer_value.GetMax():
                 raise ValueError('Parameter value for {} not inside valid range [{}, {}], was {}'.format(
                     key, integer_value.GetMin(), integer_value.GetMax(), value))
             integer_value.SetValue(value)
             return
 
-        cdef IFloat* float_value = dynamic_cast_ifloat_ptr(node)
-        if float_value != NULL:
+        cdef IFloat* float_value
+        if interface_type == intfIFloat:
+            float_value = dynamic_cast_ifloat_ptr(node)
             if value < float_value.GetMin() or value > float_value.GetMax():
                 raise ValueError('Parameter value for {} not inside valid range [{}, {}], was {}'.format(
                     key, float_value.GetMin(), float_value.GetMax(), value))
             float_value.SetValue(value)
             return
 
-        # TODO: Probably we also need some type of enum to be useful
-
-        # Potentially, we can always set the setting by string
+        # Can generally always access a setting by string
         cdef IValue* string_value = dynamic_cast_ivalue_ptr(node)
         if string_value == NULL:
             raise RuntimeError('Can not set key %s by string' % key)
 
         cdef bytes bytes_value = str(value).encode()
         string_value.FromString(gcstring(bytes_value))
+
 
     def keys(self):
         node_keys = list()
@@ -182,11 +182,13 @@ cdef class _PropertyMap:
 cdef class Camera:
     cdef:
         CInstantCamera camera
+        bool _chunking_enabled
 
     @staticmethod
     cdef create(IPylonDevice* device):
         obj = Camera()
         obj.camera.Attach(device)
+        obj._chunking_enabled = False
         return obj
 
     property device_info:
@@ -204,7 +206,7 @@ cdef class Camera:
                 self.camera.Open()
                 
     property is_grabbing:
-        def __get__(self):		
+        def __get__(self):
             return self.camera.IsGrabbing()
 
     def open(self):
@@ -225,7 +227,26 @@ cdef class Camera:
     def __repr__(self):
         return '<Camera {0} open={1}>'.format(self.device_info.friendly_name, self.opened)
 
-    def grab_images(self, int nr_images = -1, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
+
+    def enable_image_data_chunk(self, chunk_key):
+        """ NOTE: "ChunkSelector" property is of type enum in underlying Pylon C++ interface, however haven't got enum support in pypylon
+            wrapper NodeMap so use string equivelent representation <chunk_key> instead.  Valid values for <chunk_key> match the ChunkSelectorEnums
+            value names in "include/pylon/gige/_BaslerGigECameraParams.h" with the "ChunkSelector_" prefix chipped off."""
+
+        self._chunking_enabled = True
+        dynamic_cast_iboolean_ptr(self.camera.GetNodeMap().GetNode(gcstring("ChunkModeActive"))).SetValue(True)
+
+        dynamic_cast_ivalue_ptr(self.camera.GetNodeMap().GetNode(gcstring("ChunkSelector"))).FromString(gcstring(str(chunk_key).encode()))
+        dynamic_cast_iboolean_ptr(self.camera.GetNodeMap().GetNode(gcstring("ChunkEnable"))).SetValue(True)
+
+
+    def disable_image_data_chunk(self, chunk_key):
+
+        dynamic_cast_ivalue_ptr(self.camera.GetNodeMap().GetNode(gcstring("ChunkSelector"))).FromString(gcstring(str(chunk_key).encode()))
+        dynamic_cast_iboolean_ptr(self.camera.GetNodeMap().GetNode(gcstring("ChunkEnable"))).SetValue(False)
+
+
+    def _grab_images(self, bool chunked, int nr_images, EGrabStrategy grab_strategy, unsigned int timeout):
 
         if not self.opened:
             raise RuntimeError('Camera not opened')
@@ -255,6 +276,8 @@ cdef class Camera:
                     error_desc = (<string>(ACCESS_CGrabResultPtr_GetErrorDescription(ptr_grab_result))).decode()
                     raise RuntimeError(error_desc)
 
+                # Type conversion to IImage appears to work happily regardless of whether <ptr_grab_result> payload
+                # type is PayloadType_ChunkData or PayloadType_Image
                 img = &(<IImage&>ptr_grab_result)
                 if not img.IsValid():
                     raise RuntimeError('Graped IImage is not valid.')
@@ -274,18 +297,55 @@ cdef class Camera:
                 # TODO: How to handle multi-byte data here?
                 img_data = img_data.reshape((img.GetHeight(), -1))
                 # img_data = img_data[:img.GetHeight(), :img.GetWidth()]
-                yield img_data
+
+                if (chunked):
+                    # Client is requesting images to be returned as tuple of image and chunk data node map (dictionary-ish)
+                    #
+                    # Valid dictionary keys match the <chunk_key> values fed into enable_image_data_chunk() with a "Chunk"
+                    # prefix
+
+                    image_chunk_data = None
+
+                    if self._chunking_enabled:
+
+                        assert ACCESS_CGrabResultPtr_GetPayloadType(ptr_grab_result) == PayloadType_ChunkData
+ 
+                        # NOTE: <image_chunk_data> refers to its underlying <ptr_grab_result> data structure via a normal pointer
+                        # (rather than a reference counting smart pointer) and therefore does nothing to ensure that its
+                        # lifetime is extended appropriately, however it is paired with <img_data> which does seem to have
+                        # some form of smart reference back to the source <ptr_grab_result>.
+                        image_chunk_data = NodeMap.create(&(ACCESS_CGrabResultPtr_GetChunkDataNodeMap(ptr_grab_result)))
+
+                    yield (img_data, image_chunk_data)
+
+                else:
+
+                    yield img_data
 
         except:
             self.stop_grabbing()
             raise
 
+    def grab_images(self, int nr_images = -1, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
+
+        return self._grab_images(nr_images, False, grab_strategy, timeout)
+
+
+    def grab_chunked_images(self, int nr_images = -1, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
+
+        return self._grab_images(nr_images, True, grab_strategy, timeout)
+
+
     def grab_image(self, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
-        return next(self.grab_images(1, grab_strategy, timeout))
+        return next(self.grab_images(1, False, grab_strategy, timeout))
+
+
+    def grab_chunked_image(self, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
+        return next(self.grab_images(1, True, grab_strategy, timeout))
 
     property properties:
         def __get__(self):
-            return _PropertyMap.create(&self.camera.GetNodeMap())
+            return NodeMap.create(&self.camera.GetNodeMap())
 
     # Configuration properties associated with various grab strategies
     property max_num_buffer:
