@@ -328,20 +328,20 @@ cdef class Camera:
 
     def grab_images(self, int nr_images = -1, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
 
-        return self._grab_images(nr_images, False, grab_strategy, timeout)
+        return self._grab_images(False, nr_images, grab_strategy, timeout)
 
 
     def grab_chunked_images(self, int nr_images = -1, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
 
-        return self._grab_images(nr_images, True, grab_strategy, timeout)
+        return self._grab_images(True, nr_images, grab_strategy, timeout)
 
 
     def grab_image(self, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
-        return next(self.grab_images(1, False, grab_strategy, timeout))
+        return next(self.grab_images(False, 1, grab_strategy, timeout))
 
 
     def grab_chunked_image(self, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
-        return next(self.grab_images(1, True, grab_strategy, timeout))
+        return next(self.grab_images(True, 1, grab_strategy, timeout))
 
     property properties:
         def __get__(self):
