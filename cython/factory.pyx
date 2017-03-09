@@ -56,6 +56,24 @@ cdef class DeviceInfo:
     def __repr__(self):
         return '<DeviceInfo {1}>'.format(self.serial_number, self.friendly_name)
 
+
+cdef class CommandNodeProxy:
+    cdef:
+        ICommand* command
+
+    @staticmethod
+    cdef create(ICommand* command):
+        obj = CommandNodeProxy()
+        obj.command = command
+        return obj
+
+    def execute(self):
+        self.command.Execute()
+
+    def is_done(self):
+        return self.command.IsDone()
+
+
 cdef class NodeMap:
     cdef:
         INodeMap* map
@@ -93,12 +111,17 @@ cdef class NodeMap:
         if node == NULL:
             raise KeyError('Key does not exist')
 
-        if not node_is_readable(node):
-            raise IOError('Key is not readable')
-
         # TODO: Would be nice to figure out how to do enums.
 
         cdef EInterfaceType interface_type = node.GetPrincipalInterfaceType()
+
+        if interface_type == intfICommand:
+           return CommandNodeProxy.create(dynamic_cast_icommand_ptr(node))
+
+
+        if not node_is_readable(node):
+            raise IOError('Key is not readable')
+
 
         if interface_type == intfIBoolean:
             return dynamic_cast_iboolean_ptr(node).GetValue()
@@ -130,6 +153,9 @@ cdef class NodeMap:
         # TODO: Would be nice to figure out how to do enums.
 
         cdef EInterfaceType interface_type = node.GetPrincipalInterfaceType()
+
+        if interface_type == intfICommand:
+           raise IOError('Command properties do not support assignment')
 
         if interface_type == intfIBoolean:
             dynamic_cast_iboolean_ptr(node).SetValue(value)
@@ -204,7 +230,7 @@ cdef class Camera:
                 self.camera.Close()
             elif not self.opened and opened:
                 self.camera.Open()
-                
+
     property is_grabbing:
         def __get__(self):
             return self.camera.IsGrabbing()
@@ -309,7 +335,7 @@ cdef class Camera:
                     if self._chunking_enabled:
 
                         assert ACCESS_CGrabResultPtr_GetPayloadType(ptr_grab_result) == PayloadType_ChunkData
- 
+
                         # NOTE: <image_chunk_data> refers to its underlying <ptr_grab_result> data structure via a normal pointer
                         # (rather than a reference counting smart pointer) and therefore does nothing to ensure that its
                         # lifetime is extended appropriately, however it is paired with <img_data> which does seem to have
@@ -342,6 +368,7 @@ cdef class Camera:
 
     def grab_chunked_image(self, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
         return next(self.grab_images(True, 1, grab_strategy, timeout))
+
 
     property properties:
         def __get__(self):

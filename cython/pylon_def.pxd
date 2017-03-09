@@ -54,6 +54,11 @@ cdef extern from "GenApi/GenApi.h" namespace 'GenApi':
         double GetMin()
         double GetMax()
 
+    cdef cppclass ICommand:
+        void Execute() except +
+        bool IsDone() except +
+
+
     cdef cppclass NodeList_t:
         cppclass iterator:
             INode* operator*()
@@ -78,7 +83,7 @@ cdef extern from *:
     IBoolean* dynamic_cast_iboolean_ptr "dynamic_cast<GenApi::IBoolean*>" (INode*) except +
     IInteger* dynamic_cast_iinteger_ptr "dynamic_cast<GenApi::IInteger*>" (INode*) except +
     IFloat* dynamic_cast_ifloat_ptr "dynamic_cast<GenApi::IFloat*>" (INode*) except +
-    INodeMap* dynamic_cast_inodemap_ptr "dynamic_cast<GenApi::INodeMap*>" (INode*) except +
+    ICommand* dynamic_cast_icommand_ptr "dynamic_cast<GenApi::ICommand*>" (INode*) except +
     INodeMap* dynamic_cast_inodemap_ptr "dynamic_cast<GenApi::INodeMap*>" (INode*) except +
     ICategory* dynamic_cast_icategory_ptr "dynamic_cast<GenApi::ICategory*>" (INode*) except +
 
@@ -114,7 +119,7 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
 
 
     # NOTE: We don't bother providing cython import definition for CGrabResultData class as the only way that CGrabResultPtr provides
-    # for accessing its underlying data is with a -> operator override, which cython doesn't support.  Instead have to use the 
+    # for accessing its underlying data is with a -> operator override, which cython doesn't support.  Instead have to use the
     # assorted ACCESS_CGrabResultPtr_xxx functions
 
     cdef cppclass CGrabResultPtr:
