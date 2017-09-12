@@ -39,6 +39,7 @@
 
 #if _MSC_VER > 1000
 #pragma once
+#define _STDINT
 #endif
 
 // #if _MSC_VER >= 1600 // [
