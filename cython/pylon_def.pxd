@@ -143,6 +143,13 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
         GrabStrategy_LatestImageOnly,
         GrabStrategy_LatestImages,
         GrabStrategy_UpcomingImage
+        
+    cdef enum EDeviceAccessMode:
+        Control,
+        Stream,
+        Event,
+        Exclusive,
+        _NumModes
 
     cdef cppclass CInstantCamera:
         CInstantCamera()
@@ -166,11 +173,6 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
         IInteger &MaxNumQueuedBuffer;
         IInteger &OutputQueueSize;
 
-
-
-
-
-
     cdef cppclass DeviceInfoList_t:
         cppclass iterator:
             CDeviceInfo operator*()
@@ -185,7 +187,9 @@ cdef extern from "pylon/PylonIncludes.h" namespace 'Pylon':
 
     cdef cppclass CTlFactory:
         int EnumerateDevices(DeviceInfoList_t&, bool add_to_list=False)
-        IPylonDevice* CreateDevice(CDeviceInfo&)
+        IPylonDevice* CreateDevice(CDeviceInfo&) except +
+        bool IsDeviceAccessible(CDeviceInfo&, EDeviceAccessMode)
+        
 
 # Hack to define a static member function
 cdef extern from "pylon/PylonIncludes.h"  namespace 'Pylon::CTlFactory':

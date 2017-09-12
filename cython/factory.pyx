@@ -419,4 +419,10 @@ cdef class Factory:
 
     def create_device(self, DeviceInfo dev_info):
         cdef CTlFactory* tl_factory = &GetInstance()
-        return Camera.create(tl_factory.CreateDevice(dev_info.dev_info))
+        cdef IPylonDevice* device
+        cdef bool accessible = tl_factory.IsDeviceAccessible(dev_info.dev_info, Control)
+        if accessible:
+            device = tl_factory.CreateDevice(dev_info.dev_info)
+        else:
+            raise RuntimeError('{} not accessible.\nIs it open somewhere else?'.format(<string>dev_info.dev_info.GetFriendlyName()))
+        return Camera.create(device)
