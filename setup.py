@@ -39,6 +39,12 @@ def fake_detect_pylon_windows(pylon_dir=r'C:\Program Files\Basler\pylon 5'):
                                        os.path.join(pylon_dir, 'Development', 'lib', arch)]
     compiler_config['libraries'] = list([_[:-4] for _ in os.listdir(os.path.join(pylon_dir, 'Development', 'lib', arch))
                                          if  _.endswith('.lib')])
+                                         
+    # if python 2 and windows, include local include that has stdint.h from higher version VC
+    if sys.version_info[0] == 2:
+        pypylon_folder = os.path.realpath(os.path.dirname(__file__))
+        compiler_config['include_dirs'].append(os.path.join(pypylon_folder,'include'))
+        
     return compiler_config
 
 def fake_detect_pylon_osx(pylon_dir='/Library/Frameworks/pylon.framework'):
