@@ -9,13 +9,13 @@ print('Build against pylon library version:', pypylon.pylon_version.version)
 available_cameras = pypylon.factory.find_devices()
 print('Available cameras are', available_cameras)
 
-# Grep the first one and create a camera for it
+# Grep the last one and create a camera for it
 cam = pypylon.factory.create_device(available_cameras[-1])
 
-# We can still get information of the camera back
+# We can still get information of the camera
 print('Camera info of camera object:', cam.device_info)
 
-# Open camera and grep some images
+# Open camera and grab some images
 cam.open()
 
 # get max pixels in X,Y
@@ -27,7 +27,7 @@ offY = maxY//4
 width = maxX//2
 height = maxY//2
 
-# check is ROI is valid
+# check if ROI is valid
 if offX+width > maxX:
     print('X offset+width > {}'.format(maxX))
     raise
