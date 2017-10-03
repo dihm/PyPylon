@@ -140,7 +140,7 @@ cdef class NodeMap:
         return (<string>(string_value.ToString())).decode()
 
 
-    def __setitem__(self, str key, value):
+    def __setitem__(self, basestring key, value):
         cdef bytes bytes_name = key.encode()
         cdef INode* node = self.map.GetNode(gcstring(bytes_name))
 
