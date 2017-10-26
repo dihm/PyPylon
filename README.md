@@ -9,8 +9,8 @@ While the basic code seems to work, I'd like to point out, that it still in earl
 ## Installation
 On Windows, requires Visual C++ compiler that matches python distribution.
 
-Package must be installed in develop mode. To install directly from github with pip:
-`pip install -e git+https://github.com/dihm/PyPylon.git#egg=PyPylon`
+To install directly from github with pip:
+`pip install -U git+https://github.com/dihm/PyPylon.git#egg=PyPylon`
 
 ## Current TODO list and development targets
  - [ ] Test with color cameras
