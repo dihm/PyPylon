@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
-from Cython.Distutils import build_ext, Extension
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
+from Cython.Build import cythonize
 import subprocess
 import os
 import os.path
@@ -84,7 +86,7 @@ setup(name='pypylon',
       author="Matthias Blaicher",
       author_email="matthias@blaicher.com",
       cmdclass={'build_ext': build_ext},
-      ext_modules=pypylon_extensions,
+      ext_modules=cythonize(pypylon_extensions),
       packages=find_packages(exclude=['contrib', 'docs', 'tests', 'examples', 'cython']),
 
       # for the classifiers review see:
