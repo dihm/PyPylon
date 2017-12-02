@@ -363,11 +363,11 @@ cdef class Camera:
 
 
     def grab_image(self, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
-        return next(self.grab_images(False, 1, grab_strategy, timeout))
+        return next(self._grab_images(False, 1, grab_strategy, timeout))
 
 
     def grab_chunked_image(self, EGrabStrategy grab_strategy=GrabStrategy_OneByOne, unsigned int timeout=5000):
-        return next(self.grab_images(True, 1, grab_strategy, timeout))
+        return next(self._grab_images(True, 1, grab_strategy, timeout))
 
 
     property properties:
